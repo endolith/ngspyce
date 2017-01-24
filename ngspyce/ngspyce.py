@@ -184,7 +184,8 @@ def cmd(command):
     if len(command) > max_length:
         raise ValueError('Command length', len(command), 'greater than',
                          max_length)
-    captured_output.clear()
+    # captured_output.clear()  # Python 3
+    del captured_output[:]  # Python 2
     spice.ngSpice_Command(command.encode('ascii'))
     logger.debug('Command %s returned %s', command, captured_output)
     return captured_output
