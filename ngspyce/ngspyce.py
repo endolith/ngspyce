@@ -246,7 +246,7 @@ def plots():
     """
     List available plots (result sets)
 
-    Each plot is a collection of vector results
+    Each plot is a collection of vectors for a particular analysis.
 
     Returns
     -------
@@ -379,15 +379,18 @@ vector_type = [
 ]
 
 
-def vectors(names=None):
+def vectors(names=None, plot=None):
     """
     Return a dictionary with the specified vectors
 
     Parameters
     ----------
     names : iterable of strings
-        Names of vectors to retrieve.  If `names` is None, return all
-        available vectors
+        Names of vectors to retrieve.  If None, return all
+        available vectors from selected `plot`.
+    plot : string
+        Plot to retrieve vectors from.  If None, use the current
+        plot.
 
     Returns
     -------
@@ -397,16 +400,32 @@ def vectors(names=None):
 
     Examples
     --------
-    Do an AC sweep and then retrieve the frequency axis and output voltage
+    Do an AC sweep and then retrieve the frequency axis and output voltage:
 
     >>> ac('dec', 3, 1e3, 10e6)
     >>> ac_results = vectors(['frequency', 'vout'])
 
+    Get lists of vectors available in different plots:
+
+    >>> vectors(plot='op1').keys()
+    dict_keys(['v1#branch', 'vout', 'V(1)'])
+
+    Retrieve vectors from a plot that is not currently selected:
+
+    >>> vectors(plot='op1', names=['vout', 'v(1)'])
+    {'v(1)': array([ 0.]), 'vout': array([ 0.])}
     """
+    latest_plot = current_plot()
+    if plot is not None:
+        cmd('setplot ' + plot)
     if names is None:
         plot = spice.ngSpice_CurPlot()
         names = vector_names(plot)
-    return dict(zip(names, map(vector, names)))
+
+    results = dict(zip(names, map(vector, names)))
+
+    cmd('setplot ' + latest_plot)
+    return results
 
 
 def vector(name, plot=None):
