@@ -7,6 +7,7 @@ import numpy as np
 import logging
 import os
 import platform
+from .electronics_value_parser import value_parser
 
 __all__ = [
     'cmd',
@@ -537,9 +538,19 @@ _valid_modes = {'dec', 'lin', 'oct'}
 
 
 def _validate_ac_sweep(mode, fstart, fstop):
+    # TODO: Should accept strings, should interpret "M" as 1e6, etc.
+    # EXCEPT ngspice already handles units and prefixes!!!!
+    # AND THIS RUINS MEG
+
     if mode.lower() not in _valid_modes:
         raise ValueError("'{}' is not a valid AC sweep "
                          "mode: {}".format(mode, _valid_modes))
+
+    fstart, unit1 = value_parser(fstart)
+    fstop, unit2 = value_parser(fstop)
+    if (unit1 and unit1 != 'hertz') or (unit2 and unit2 != 'hertz'):
+        raise ValueError('Wrong units for frequency: {}, {}'.format(unit1,
+                                                                    unit2))
     if fstop < fstart:
         raise ValueError('Start frequency', fstart,
                          'greater than stop frequency', fstop)
@@ -560,6 +571,8 @@ def ac(mode, npoints, fstart, fstop):
         Otherwise, this is the number of points per decade or per octave.
     fstart : float or str
         Starting frequency.
+        TODO: Floats or strings like '1k', '1 MHz', '1meg' are
+        understood.  Note that capital "M" = 1e6, unlike SPICE.
     fstop : float or str
         Final frequency.
 
@@ -725,6 +738,8 @@ def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
         Otherwise, this is the number of points per decade or per octave.
     fstart : float or str
         Starting frequency.
+        TODO: Floats or strings like '1k', '1 MHz', '1meg' are
+        understood.  Note that capital "M" = 1e6, unlike SPICE.
     fstop : float or str
         Final frequency.
     pts_per_summary : int, optional
