@@ -30,6 +30,7 @@ __all__ = [
     'source',
     'xspice_enabled',
     'noise',
+    'current_plot',
 ]
 
 logger = logging.getLogger(__name__)
@@ -792,3 +793,7 @@ def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
     spectral_results = 'noise' + str(int(total_results.split('noise')[1]) - 1)
 
     return {**vectors(plot=total_results), **vectors(plot=spectral_results)}
+
+
+def current_plot():
+    return spice.ngSpice_CurPlot().decode('ascii')
