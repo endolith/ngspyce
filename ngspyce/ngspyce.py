@@ -512,7 +512,18 @@ def alter_model(device, **params):
         cmd('altermod {} {} = {:.6e}'.format(device, k, v))
 
 
-valid_modes = {'dec', 'lin', 'oct'}
+_valid_modes = {'dec', 'lin', 'oct'}
+
+
+def _validate_ac_sweep(mode, fstart, fstop):
+    if mode.lower() not in _valid_modes:
+        raise ValueError("'{}' is not a valid AC sweep "
+                         "mode: {}".format(mode, _valid_modes))
+    if fstop < fstart:
+        raise ValueError('Start frequency', fstart,
+                         'greater than stop frequency', fstop)
+
+    return fstart, fstop
 
 
 def ac(mode, npoints, fstart, fstop):
@@ -552,13 +563,8 @@ def ac(mode, npoints, fstart, fstop):
     >>> len(results['frequency'])
     21
     """
-    modes = ('dec', 'lin', 'oct')
-    if mode.lower() not in modes:
-        raise ValueError("'{}' is not a valid AC sweep "
-                         "mode: {}".format(mode, modes))
-    if fstop < fstart:
-        raise ValueError('Start frequency', fstart,
-                        'greater than stop frequency', fstop)
+    fstart, fstop = _validate_ac_sweep(mode, fstart, fstop)
+
     cmd('ac {} {} {} {}'.format(mode, npoints, fstart, fstop))
     return vectors()
 
@@ -737,13 +743,7 @@ def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
 
     >>> noise((2, 3), 'vin', 'lin', 21, 0, 20e3)
     """
-    if mode.lower() not in valid_modes:
-        raise ValueError("'{}' is not a valid AC sweep "
-                         "mode: {}".format(mode, valid_modes))
-
-    if fstop < fstart:
-        raise Exception('Start frequency', fstart,
-                        'greater than stop frequency', fstop)
+    fstart, fstop = _validate_ac_sweep(mode, fstart, fstop)
 
     if not isinstance(output, str):
         try:
