@@ -1,6 +1,7 @@
 import unittest
 import os
 from numpy import pi
+from numpy.testing import assert_allclose
 import ngspyce as ns
 
 
@@ -131,6 +132,51 @@ class TestCommands(NgspiceTest):
 
         # fstart > fstop
         self.assertRaises(ValueError, ns.ac, 'lin', 2, 3, 2)
+
+    def test_noise(self):
+        # No circuit loaded yet
+        # TODO: Can printing be suppressed?
+        self.assertRaises(RuntimeError, ns.noise, 1, 'v', 'lin', 10, 1, 2)
+
+        ns.circ(['r1  out 2  10k', 'vin  2  0  dc 0  ac 1'])
+
+        # Try different output formats, modes, and freq formats
+        tests = (ns.noise('out', 'vin', 'lin', 10, '1 kHz', '100 kHz'),
+                 ns.noise(('out', 0), 'vin', 'dec', 4, '1k', '100k'),
+                 ns.noise((0, 'out'), 'vin', 'dec', 3, 1e3, 100e3))
+
+        for results in tests:
+            self.assertEqual(results.keys(),
+                             {'onoise_total', 'inoise_total',
+                              'inoise_spectrum', 'frequency',
+                              'onoise_spectrum'})
+
+            total = 4.05096353e-06  # V
+            assert_allclose(results['onoise_total'], total, rtol=1e-5)
+            assert_allclose(results['inoise_total'], total, rtol=1e-5)
+
+            spectral = 1.28748072e-08  # V/√Hz
+            assert_allclose(spectral, results['onoise_spectrum'], rtol=1e-5)
+            assert_allclose(spectral, results['inoise_spectrum'], rtol=1e-5)
+
+        # Invalid outputs, mode, sweep fstart > fstop
+        self.assertRaises(ValueError, ns.noise, (5,), 'vin', 'lin', 10, 1e3,
+                          3e3)
+        self.assertRaises(ValueError, ns.noise, (5, 3, 1), 'vin', 'lin', 10,
+                          1e3, 3e3)
+        self.assertRaises(ValueError, ns.noise, 'out', 'vin', 'foo', 10, 1e3,
+                          100e3)
+        self.assertRaises(ValueError, ns.noise, 'out', 'vin', 'dec', 10, 3e3,
+                          1e3)
+
+        # Test numeric nodes and octave mode
+        ns.circ(['r1  3 2  1k', 'vin  2  0  dc 0  ac 1'])
+        tests = (ns.noise(3, 'vin', 'oct', 5, '1k', '8kHz'),
+                 ns.noise((3, 0), 'vin', 'oct', 1, '1k', '8kHz'),
+                 ns.noise((0, 3), 'vin', 'oct', 3, 1e3, 8e3))
+
+        for results in tests:
+            assert_allclose(results['inoise_total'], 0.34063561e-6, rtol=1e-4)
 
 
 class TestHelpers(unittest.TestCase):

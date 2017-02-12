@@ -28,7 +28,8 @@ __all__ = [
     'alter',
     'linear_sweep',
     'source',
-    'xspice_enabled'
+    'xspice_enabled',
+    'noise',
 ]
 
 logger = logging.getLogger(__name__)
@@ -511,6 +512,9 @@ def alter_model(device, **params):
         cmd('altermod {} {} = {:.6e}'.format(device, k, v))
 
 
+valid_modes = {'dec', 'lin', 'oct'}
+
+
 def ac(mode, npoints, fstart, fstop):
     """
     Perform small-signal AC analysis
@@ -673,3 +677,98 @@ def xspice_enabled():
     return '** XSPICE extensions included' in cmd('version -f')
 
 initialize()
+
+
+def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
+    """
+    Perform small-signal AC analysis
+
+    Parameters
+    ----------
+    output : str, int, or tuple
+        Node at which the total output noise is measured.  If a single node,
+        it is referenced to ground.  If a tuple of nodes, then the noise
+        voltage measured across the two nodes is calculated.
+    source : str
+        Name of an independent source to which input noise is referred.
+    mode : {'lin', 'dec', oct'}
+        Frequency axis spacing: linear, decade, or octave.
+    npoints : int
+        If mode is 'lin', this is the total number of points for the sweep.
+        Otherwise, this is the number of points per decade or per octave.
+    fstart : float or str
+        Starting frequency.
+    fstop : float or str
+        Final frequency.
+    pts_per_summary : int, optional
+        If specified, the noise contributions of each noise generator is
+        produced every `pts_per_summary` frequency points.
+
+    Returns
+    -------
+    results : dict
+        Dictionary of test results.  This includes both plots (total and
+        spectral) that are normally produced by ngspice:
+
+            onoise_total
+                Total output noise, integrated over the specified frequency
+                range, in Vrms or Irms
+            inoise_total
+                Total integrated input-referred noise
+            frequency
+                Frequency points at which spectral densities were measured
+            onoise_spectrum
+                Output noise spectral density, in V/√Hz or A/√Hz
+            inoise_spectrum
+                Input noise spectral density
+
+    Examples
+    --------
+    Measure noise at node `out`, with input noise referred to voltage source
+    `vin`, swept from 1 kHz to 10 MHz with 3 points per decade:
+
+    >>> results = noise('out', 'vin', 'dec', 3, '1kHz', '10 MHz')
+    >>> results.keys()
+    dict_keys(['onoise_total', 'frequency', 'inoise_total', 'inoise_spectrum',
+    'onoise_spectrum'])
+
+    Measure between nodes 2 and 3, sweeping from 0 to 20 kHz in 21
+    linearly-spaced points:
+
+    >>> noise((2, 3), 'vin', 'lin', 21, 0, 20e3)
+    """
+    if mode.lower() not in valid_modes:
+        raise ValueError("'{}' is not a valid AC sweep "
+                         "mode: {}".format(mode, valid_modes))
+
+    if fstop < fstart:
+        raise Exception('Start frequency', fstart,
+                        'greater than stop frequency', fstop)
+
+    if not isinstance(output, str):
+        try:
+            if len(output) == 2:
+                output = '{} {}'.format(output[0], output[1])
+            else:
+                raise ValueError('"output" tuple must have two elements')
+        except TypeError:
+            # It's just an int, pass it through
+            pass
+
+    if pts_per_summary is None:
+        pts_per_summary = ''
+
+    cmd('noise v({}) {} {} {} {} {} {}'.format(output, source, mode, npoints,
+                                               fstart, fstop, pts_per_summary))
+
+    # ngspice stores results in two plots, but Python can return both at once.
+
+    # Get latest noise plot:
+    total_results = spice.ngSpice_CurPlot().decode('ascii')
+    if not total_results[:5] == 'noise':
+        raise RuntimeError('Noise analysis failed: Check parameters.')
+
+    # Next-to-last plot contains spectra
+    spectral_results = 'noise' + str(int(total_results.split('noise')[1]) - 1)
+
+    return {**vectors(plot=total_results), **vectors(plot=spectral_results)}
