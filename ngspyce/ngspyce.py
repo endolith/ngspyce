@@ -800,7 +800,7 @@ def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
     # ngspice stores results in two plots, but Python can return both at once.
 
     # Get latest noise plot:
-    total_results = spice.ngSpice_CurPlot().decode('ascii')
+    total_results = current_plot()
     if not total_results[:5] == 'noise':
         raise RuntimeError('Noise analysis failed: Check parameters.')
 
@@ -816,19 +816,32 @@ def transient(tstep, tstop, tstart=0, tmax=None, uic=None):
 
     Parameters
     ----------
+    tstep : float or str
+        Time increment for line-printer output. For use with the post-processor, tstep is the suggested computing increment.
+    tstop : float or str
+        final time
+    tstart : float or str
+        initial time (defaults to 0 sec)
 
-tstep is the printing or plotting increment for line-printer output. For use with the post-
-processor, tstep is the suggested computing increment. tstop is the final time, and tstart
-is the initial time. If tstart is omitted, it is assumed to be zero. The transient analysis always
-begins at time zero. In the interval <zero, tstart>, the circuit is analyzed (to reach a steady
-state), but no outputs are stored. In the interval <tstart, tstop>, the circuit is analyzed and
-outputs are stored. tmax is the maximum stepsize that ngspice uses; for default, the program
-chooses either tstep or (tstop-tstart)/50.0, whichever is smaller. tmax is useful when one
-wishes to guarantee a computing interval which is smaller than the printer increment, tstep.
+    The transient analysis always begins at time zero. In the interval
+    <zero, tstart>, the circuit is analyzed (to reach a steady state), but no
+    outputs are stored. In the interval <tstart, tstop>, the circuit is
+    analyzed and
+    outputs are stored.
+
+    tmax : float or str
+        maximum stepsize that ngspice uses; for default, the program
+        chooses either tstep or (tstop-tstart)/50.0, whichever is smaller.
+        tmax is useful when one
+        wishes to guarantee a computing interval which is smaller than the
+        printer increment, tstep.
+
 An initial transient operating point at time zero is calculated according to the following proce-
 dure: all independent voltages and currents are applied with their time zero values, all capaci-
 tancesareopened, inductancesareshorted, thenonlineardeviceequationsaresolvediteratively.
-uic (use initial conditions) is an optional keyword which indicates that the user does not want
+
+    uic : keyword?
+        (use initial conditions) is an optional keyword which indicates that the user does not want
 ngspice to solve for the quiescent operating point before beginning the transient analysis. If this
 keyword is specified, ngspice uses the values specified using IC=... on the various elements as
 the initial transient condition and proceeds with the analysis. If the .ic control line has been
@@ -898,37 +911,21 @@ specified.
 
     >>> noise((2, 3), 'vin', 'lin', 21, 0, 20e3)
     """
-    fstart, fstop = _validate_ac_sweep(mode, fstart, fstop)
 
-    if not isinstance(output, str):
-        try:
-            if len(output) == 2:
-                output = '{} {}'.format(output[0], output[1])
-            else:
-                raise ValueError('"output" tuple must have two elements')
-        except TypeError:
-            # It's just an int, pass it through
-            pass
+    if tmax is None:
+        tmax = ''
+    if uic is None:
+        uic = ''
+    cmd('tran {tstep} {tstop} {tstart} {tmax} {uic}'.format(**locals()))
 
-    if pts_per_summary is None:
-        pts_per_summary = ''
+    # Get latest plot:
+    total_results = current_plot()
+    if not total_results[:4] == 'tran':
+        raise RuntimeError('Transient analysis failed: Check parameters.')
 
-    cmd('noise v({}) {} {} {} {} {} {}'.format(output, source, mode, npoints,
-                                               fstart, fstop, pts_per_summary))
-
-    # ngspice stores results in two plots, but Python can return both at once.
-
-    # Get latest noise plot:
-    total_results = spice.ngSpice_CurPlot().decode('ascii')
-    if not total_results[:5] == 'noise':
-        raise RuntimeError('Noise analysis failed: Check parameters.')
-
-    # Next-to-last plot contains spectra
-    spectral_results = 'noise' + str(int(total_results.split('noise')[1]) - 1)
-
-    return {**vectors(plot=total_results), **vectors(plot=spectral_results)}
+    return vectors()
 
 
-
+# TODO: REname to latest_plot last_plot recent_plot newest_plot to avoid electrical current synonym?
 def current_plot():
     return spice.ngSpice_CurPlot().decode('ascii')
