@@ -32,6 +32,7 @@ __all__ = [
     'xspice_enabled',
     'noise',
     'current_plot',
+    'transient',
 ]
 
 logger = logging.getLogger(__name__)
