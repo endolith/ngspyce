@@ -810,5 +810,125 @@ def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
     return {**vectors(plot=total_results), **vectors(plot=spectral_results)}
 
 
+def transient(tstep, tstop, tstart=0, tmax=None, uic=None):
+    """
+    Perform transient analysis
+
+    Parameters
+    ----------
+
+tstep is the printing or plotting increment for line-printer output. For use with the post-
+processor, tstep is the suggested computing increment. tstop is the final time, and tstart
+is the initial time. If tstart is omitted, it is assumed to be zero. The transient analysis always
+begins at time zero. In the interval <zero, tstart>, the circuit is analyzed (to reach a steady
+state), but no outputs are stored. In the interval <tstart, tstop>, the circuit is analyzed and
+outputs are stored. tmax is the maximum stepsize that ngspice uses; for default, the program
+chooses either tstep or (tstop-tstart)/50.0, whichever is smaller. tmax is useful when one
+wishes to guarantee a computing interval which is smaller than the printer increment, tstep.
+An initial transient operating point at time zero is calculated according to the following proce-
+dure: all independent voltages and currents are applied with their time zero values, all capaci-
+tancesareopened, inductancesareshorted, thenonlineardeviceequationsaresolvediteratively.
+uic (use initial conditions) is an optional keyword which indicates that the user does not want
+ngspice to solve for the quiescent operating point before beginning the transient analysis. If this
+keyword is specified, ngspice uses the values specified using IC=... on the various elements as
+the initial transient condition and proceeds with the analysis. If the .ic control line has been
+specified (see 15.2.2), then the node voltages on the .ic line are used to compute the initial
+conditions for the devices. IC=... will take precedence over the values given in the .ic control
+line. If neither IC=... nor the .ic control line is given for a specific node, node voltage zero is
+assumed.
+Look at the description on the .ic control line (15.2.2) for its interpretation when uic is not
+specified.
+
+
+
+
+
+
+    output : str, int, or tuple
+        Node at which the total output noise is measured.  If a single node,
+        it is referenced to ground.  If a tuple of nodes, then the noise
+        voltage measured across the two nodes is calculated.
+    source : str
+        Name of an independent source to which input noise is referred.
+    mode : {'lin', 'dec', oct'}
+        Frequency axis spacing: linear, decade, or octave.
+    npoints : int
+        If mode is 'lin', this is the total number of points for the sweep.
+        Otherwise, this is the number of points per decade or per octave.
+    fstart : float or str
+        Starting frequency.
+        TODO: Floats or strings like '1k', '1 MHz', '1meg' are
+        understood.  Note that capital "M" = 1e6, unlike SPICE.
+    fstop : float or str
+        Final frequency.
+    pts_per_summary : int, optional
+        If specified, the noise contributions of each noise generator is
+        produced every `pts_per_summary` frequency points.
+
+    Returns
+    -------
+    results : dict
+        Dictionary of test results.  This includes both plots (total and
+        spectral) that are normally produced by ngspice:
+
+            onoise_total
+                Total output noise, integrated over the specified frequency
+                range, in Vrms or Irms
+            inoise_total
+                Total integrated input-referred noise
+            frequency
+                Frequency points at which spectral densities were measured
+            onoise_spectrum
+                Output noise spectral density, in V/√Hz or A/√Hz
+            inoise_spectrum
+                Input noise spectral density
+
+    Examples
+    --------
+    Measure noise at node `out`, with input noise referred to voltage source
+    `vin`, swept from 1 kHz to 10 MHz with 3 points per decade:
+
+    >>> results = noise('out', 'vin', 'dec', 3, '1kHz', '10 MHz')
+    >>> results.keys()
+    dict_keys(['onoise_total', 'frequency', 'inoise_total', 'inoise_spectrum',
+    'onoise_spectrum'])
+
+    Measure between nodes 2 and 3, sweeping from 0 to 20 kHz in 21
+    linearly-spaced points:
+
+    >>> noise((2, 3), 'vin', 'lin', 21, 0, 20e3)
+    """
+    fstart, fstop = _validate_ac_sweep(mode, fstart, fstop)
+
+    if not isinstance(output, str):
+        try:
+            if len(output) == 2:
+                output = '{} {}'.format(output[0], output[1])
+            else:
+                raise ValueError('"output" tuple must have two elements')
+        except TypeError:
+            # It's just an int, pass it through
+            pass
+
+    if pts_per_summary is None:
+        pts_per_summary = ''
+
+    cmd('noise v({}) {} {} {} {} {} {}'.format(output, source, mode, npoints,
+                                               fstart, fstop, pts_per_summary))
+
+    # ngspice stores results in two plots, but Python can return both at once.
+
+    # Get latest noise plot:
+    total_results = spice.ngSpice_CurPlot().decode('ascii')
+    if not total_results[:5] == 'noise':
+        raise RuntimeError('Noise analysis failed: Check parameters.')
+
+    # Next-to-last plot contains spectra
+    spectral_results = 'noise' + str(int(total_results.split('noise')[1]) - 1)
+
+    return {**vectors(plot=total_results), **vectors(plot=spectral_results)}
+
+
+
 def current_plot():
     return spice.ngSpice_CurPlot().decode('ascii')
