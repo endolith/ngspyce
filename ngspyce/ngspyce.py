@@ -911,6 +911,9 @@ specified.
     linearly-spaced points:
 
     >>> noise((2, 3), 'vin', 'lin', 21, 0, 20e3)
+
+    NOTE THAT TIME IS NOT UNIFORMLY SPACED
+
     """
 
     if tmax is None:
