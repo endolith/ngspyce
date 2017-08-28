@@ -33,6 +33,7 @@ __all__ = [
     'noise',
     'current_plot',
     'transient',
+    'unload',
 ]
 
 logger = logging.getLogger(__name__)
@@ -717,8 +718,6 @@ def xspice_enabled():
     """
     return '** XSPICE extensions included' in cmd('version -f')
 
-initialize()
-
 
 def noise(output, source, mode, npoints, fstart, fstop, pts_per_summary=None):
     """
@@ -933,3 +932,31 @@ specified.
 # TODO: REname to latest_plot last_plot recent_plot newest_plot to avoid electrical current synonym?
 def current_plot():
     return spice.ngSpice_CurPlot().decode('ascii')
+
+
+import ctypes
+
+def unload():
+    kernel32 = ctypes.WinDLL('kernel32')
+    kernel32.FreeLibrary.argtypes = [ctypes.wintypes.HMODULE]
+
+    handle = spice._handle # obtain the DLL handle
+    kernel32.FreeLibrary(handle)
+
+""" Doesn't work
+
+Traceback (most recent call last):
+
+  File "<ipython-input-3-96cb3c79dcea>", line 1, in <module>
+    ngspyce.unload()
+
+  File "C:\Anaconda3\lib\site-packages\ngspyce\ngspyce.py", line 941, in unload
+    windll.kernel32.FreeLibrary(handle)
+
+ArgumentError: argument 1: <class 'OverflowError'>: int too long to convert
+
+
+"""
+
+
+initialize()
