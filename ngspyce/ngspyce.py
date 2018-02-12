@@ -9,6 +9,11 @@ import os
 import platform
 from .electronics_value_parser import value_parser
 
+try:
+  from _ctypes import dlclose # Linux
+except:
+  from _ctypes import FreeLibrary as dlclose # Windows
+
 __all__ = [
     'cmd',
     'circ',
@@ -34,6 +39,7 @@ __all__ = [
     'current_plot',
     'transient',
     'unload',
+    'detach',
 ]
 
 logger = logging.getLogger(__name__)
@@ -45,6 +51,17 @@ if os.name == 'nt':  # Windows
     curr_dir_before = os.getcwd()
 
     drive = os.getenv("SystemDrive") or 'C:'
+
+#    # Python and DLL must both be same number of bits
+#    if platform.architecture()[0] == '64bit':
+#        spice_path = os.path.join(drive, os.sep, 'Spice64_dll')
+#    elif platform.architecture()[0] == '32bit':
+#        spice_path = os.path.join(drive, os.sep, 'Spice_TODO')
+#    else:
+#        raise RuntimeError("Couldn't determine if Python is 32-bit or 64-bit")
+
+
+
 
     # Python and DLL must both be same number of bits
     if platform.architecture()[0] == '64bit':
@@ -65,7 +82,13 @@ if os.name == 'nt':  # Windows
         os.environ['SPICE_LIB_DIR'] = os.path.join(spice_path, 'share',
                                                    'ngspice')
     os.chdir(os.path.join(spice_path, 'bin_dll'))
+
+#    os.chdir(os.path.join(spice_path, 'bin-vs'))
+
+
     spice = CDLL('ngspice')
+
+    # Return to original folder before loading DLL
     os.chdir(curr_dir_before)
 else:  # Linux, etc.
     spice = CDLL(find_library('ngspice'))
@@ -958,5 +981,9 @@ ArgumentError: argument 1: <class 'OverflowError'>: int too long to convert
 
 """
 
+
+def detach():
+    cmd('quit')
+    dlclose(spice._handle)
 
 initialize()
